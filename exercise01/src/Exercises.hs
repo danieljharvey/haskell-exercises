@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+
 module Exercises where
 
 
@@ -17,24 +18,30 @@ instance Countable Bool where count x = if x then 1 else 0
 -- things.
 
 data CountableList where
-  -- ...
+  CountNil  :: CountableList
+  CountCons :: Countable a => a -> CountableList -> CountableList
 
 
 -- | b. Write a function that takes the sum of all members of a 'CountableList'
 -- once they have been 'count'ed.
 
 countList :: CountableList -> Int
-countList = error "Implement me!"
-
+countList CountNil = 0
+countList (CountCons a as) = count a + countList as
+             
 
 -- | c. Write a function that removes all elements whose count is 0.
 
 dropZero :: CountableList -> CountableList
-dropZero = error "Implement me!"
-
+dropZero CountNil = CountNil
+dropZero (CountCons a as) = if count a > 0
+                          then (CountCons a (dropZero as))
+                          else dropZero as
 
 -- | d. Can we write a function that removes all the things in the list of type
 -- 'Int'? If not, why not?
+
+-- We can't because we can't pattern match on the original constructor
 
 filterInts :: CountableList -> CountableList
 filterInts = error "Contemplate me!"
@@ -48,25 +55,40 @@ filterInts = error "Contemplate me!"
 -- | a. Write a list that can take /any/ type, without any constraints.
 
 data AnyList where
-  -- ...
+  AnyNil  :: AnyList
+  AnyCons :: a -> AnyList -> AnyList
 
 -- | b. How many of the following functions can we implement for an 'AnyList'?
 
+-- sure
 reverseAnyList :: AnyList -> AnyList
-reverseAnyList = undefined
+reverseAnyList (AnyCons a as) = undefined
+reverseAnyList AnyNil = AnyNil 
 
+-- nope - the caller decides the type of a here which is a BIG NO THANKS
+{-
 filterAnyList :: (a -> Bool) -> AnyList -> AnyList
-filterAnyList = undefined
+filterAnyList _ AnyNil = AnyNil
+filterAnyList f (AnyCons a as) = if f a
+                               then (AnyCons a (filterAnyList f as))
+                               else filterAnyList f as
+-}
 
+-- sure
 countAnyList :: AnyList -> Int
-countAnyList = undefined
+countAnyList (AnyCons a as) = 1 + countAnyList as
+countAnyList AnyNil = 0
 
+-- nope
 foldAnyList :: Monoid m => AnyList -> m
 foldAnyList = undefined
 
+-- yes
 isEmptyAnyList :: AnyList -> Bool
-isEmptyAnyList = undefined
+isEmptyAnyList AnyNil = True
+isEmptyAnyList _      = False
 
+-- nope - we know nothing about this thing so showing it is a NO WAY
 instance Show AnyList where
   show = error "What about me?"
 
@@ -95,14 +117,22 @@ transformable2 = TransformWith (uncurry (++)) ("Hello,", " world!")
 -- | a. Which type variable is existential inside 'TransformableTo'? What is
 -- the only thing we can do to it?
 
+-- Input! It does not appear on the right hand side. The only thing we can do is plop it through the provided function
+
 -- | b. Could we write an 'Eq' instance for 'TransformableTo'? What would we be
 -- able to check?
 
+instance (Eq a) => Eq (TransformableTo a) where
+    (TransformWith f a) == (TransformWith g b) = f a == g b 
+
 -- | c. Could we write a 'Functor' instance for 'TransformableTo'? If so, write
 -- it. If not, why not?
-
-
-
+--
+-- I'd like to write this but I have no guarantee the output type of f will be of type input
+{-
+instance Functor TransformableTo where
+    fmap f (TransformWith g a) = TransformWith (g . f) a
+-}
 
 
 {- FOUR -}
@@ -115,14 +145,22 @@ data EqPair where
 -- | a. There's one (maybe two) useful function to write for 'EqPair'; what is
 -- it?
 
+equals :: EqPair -> Bool
+equals (EqPair a b) = a == b
+
+notEquals :: EqPair -> Bool
+notEquals = not . equals
+
 -- | b. How could we change the type so that @a@ is not existential? (Don't
 -- overthink it!)
+
+data EqPair2 a where
+    EqPair2 :: Eq a => a -> a -> EqPair2 a
 
 -- | c. If we made the change that was suggested in (b), would we still need a
 -- GADT? Or could we now represent our type as an ADT?
 
-
-
+-- No, we'd lose the Eq constraint
 
 
 {- FIVE -}
@@ -148,19 +186,29 @@ getInt (IntBox int _) = int
 -- pattern-match:
 
 getInt' :: MysteryBox String -> Int
-getInt' _doSomeCleverPatternMatching = error "Return that value"
+getInt' (StringBox _ (IntBox i _)) = i
 
 -- | b. Write the following function. Again, don't overthink it!
 
 countLayers :: MysteryBox a -> Int
-countLayers = error "Implement me"
+countLayers EmptyBox                                      = 1
+countLayers (IntBox _ _)                                  = 2
+countLayers (StringBox _ (IntBox _ _))                    = 3
+countLayers (BoolBox _ (StringBox _ (IntBox _ EmptyBox))) = 4
 
 -- | c. Try to implement a function that removes one layer of "Box". For
 -- example, this should turn a BoolBox into a StringBox, and so on. What gets
 -- in our way? What would its type be?
 
+-- We can't have MysteryBox a because we can't constraint 'a' to be One Of The Existing Ones Thanks
 
-
+{-
+removeLayer :: MysteryBox a -> MysteryBox a
+removeLayer EmptyBox         = EmptyBox
+removeLayer (IntBox _ a)     = a
+-- removeLayer (StringBox _ a)  = a
+-- removeLayer (BoolBox _ a)    = a
+-}
 
 
 {- SIX -}
@@ -180,18 +228,19 @@ exampleHList = HCons "Tom" (HCons 25 (HCons True HNil))
 -- need to pattern-match on HNil, and therefore the return type shouldn't be
 -- wrapped in a 'Maybe'!
 
+hListHead :: HList (a, b) -> a
+hListHead (HCons head _) = head
+
 -- | b. Currently, the tuples are nested. Can you pattern-match on something of
 -- type @HList (Int, String, Bool, ())@? Which constructor would work?
 
-patternMatchMe :: HList (Int, String, Bool, ()) -> Int
-patternMatchMe = undefined
+patternMatchMe :: HList ((Int, String, Bool, ()),()) -> Int
+patternMatchMe (HCons (a,_,_,_) _) = a
 
 -- | c. Can you write a function that appends one 'HList' to the end of
 -- another? What problems do you run into?
 
-
-
-
+-- not today, daddio
 
 {- SEVEN -}
 
