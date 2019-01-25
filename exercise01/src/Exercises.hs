@@ -1,10 +1,9 @@
 {-# LANGUAGE GADTs #-}
-
+{-# LANGUAGE FlexibleInstances #-}
 module Exercises where
 
-
-
-
+import Data.Tuple (swap)
+import Data.Monoid
 
 {- ONE -}
 
@@ -235,7 +234,7 @@ hListHead (HCons head _) = head
 -- type @HList (Int, String, Bool, ())@? Which constructor would work?
 
 patternMatchMe :: HList ((Int, String, Bool, ()),()) -> Int
-patternMatchMe (HCons (a,_,_,_) _) = a
+patternMatchMe (HCons (a, _, _, _) _) = a
 
 -- | c. Can you write a function that appends one 'HList' to the end of
 -- another? What problems do you run into?
@@ -253,51 +252,65 @@ data Branch left centre right
 -- /tree/. None of the variables should be existential.
 
 data HTree a where
-  -- ...
+    HTEmpty :: HTree Empty
+    HTCons  :: l -> a -> r -> HTree (Branch l a r)
 
 -- | b. Implement a function that deletes the left subtree. The type should be
 -- strong enough that GHC will do most of the work for you. Once you have it,
 -- try breaking the implementation - does it type-check? If not, why not?
 
+deleteLeft :: HTree (Branch l a r) -> HTree (Branch (HTree Empty) a r)
+deleteLeft (HTCons _ a r) = HTCons HTEmpty a r 
+
 -- | c. Implement 'Eq' for 'HTree's. Note that you might have to write more
 -- than one to cover all possible HTrees. Recursion is your friend here - you
 -- shouldn't need to add a constraint to the GADT!
 
+instance (Eq l, Eq a, Eq r) => Eq (HTree (Branch l a r)) where
+    (HTCons l a r) == (HTCons l' a' r') 
+      = (l == l') && (a == a') && (r == r')
 
-
-
+instance Eq (HTree Empty) where
+    HTEmpty == HTEmpty = True
 
 {- EIGHT -}
 
 -- | a. Implement the following GADT such that values of this type are lists of
 -- values alternating between the two types. For example:
 --
--- @
---   f :: AlternatingList Bool Int
---   f = ACons True (ACons 1 (ACons False (ACons 2 ANil)))
--- @
+f :: AlternatingList Bool Int
+f = ACons True (ACons 1 (ACons False (ACons 2 (ACons True ANil))))
 
 data AlternatingList a b where
-  -- ...
+  ANil  :: AlternatingList a b 
+  ACons :: a -> AlternatingList b a -> AlternatingList a b
 
 -- | b. Implement the following functions.
 
 getFirsts :: AlternatingList a b -> [a]
-getFirsts = error "Implement me!"
+getFirsts (ACons a (ACons _ as)) = [a] ++ getFirsts as
+getFirsts (ACons a ANil) = [a]
+getFirsts ANil = []
 
 getSeconds :: AlternatingList a b -> [b]
-getSeconds = error "Implement me, too!"
+getSeconds (ACons _ (ACons b bs)) = [b] ++ getSeconds bs
+getSeconds (ACons _ ANil) = []
+getSeconds (ANil) = []
 
 -- | c. One more for luck: write this one using the above two functions, and
 -- then write it such that it only does a single pass over the list.
 
 foldValues :: (Monoid a, Monoid b) => AlternatingList a b -> (a, b)
-foldValues = error "Implement me, three!"
+foldValues list = (mconcat (getFirsts list), mconcat (getSeconds list))
 
+foldValues2 :: (Monoid a, Monoid b) => AlternatingList a b -> (a, b)
+foldValues2 list = foldyBoy (mempty, mempty) list
 
-
-
-
+foldyBoy :: (Monoid a, Monoid b) => (a, b) -> AlternatingList a b -> (a, b)
+foldyBoy x ANil = x
+foldyBoy (as, bs) (ACons a next)
+    = swap (foldyBoy (bs, a <> as) next)
+        
 {- NINE -}
 
 -- | Here's the "classic" example of a GADT, in which we build a simple
@@ -314,7 +327,11 @@ data Expr a where
 -- | a. Implement the following function and marvel at the typechecker:
 
 eval :: Expr a -> a
-eval = error "Implement me"
+eval (Equals x y) = eval x == eval y
+eval (Add a b)    = eval a + eval b
+eval (If i a b) = if eval i then eval a else eval b
+eval (IntValue i)  = i
+eval (BoolValue b) = b
 
 -- | b. Here's an "untyped" expression language. Implement a parser from this
 -- into our well-typed language. Note that (until we cover higher-rank
@@ -326,6 +343,13 @@ data DirtyExpr
   | DirtyIf        DirtyExpr DirtyExpr DirtyExpr
   | DirtyIntValue  Int
   | DirtyBoolValue Bool
+
+dirtyParse :: DirtyExpr -> Maybe (Expr a)
+dirtyParse (DirtyEquals a b)  = Equals <$> dirtyParse a <*> dirtyParse b
+dirtyParse (DirtyAdd a b)     = Add <$> dirtyParse a <*> dirtyParse b
+dirtyParse (DirtyIf a b c)    = If <$> dirtyParse a <*> dirtyParse b <*> dirtyParse c
+dirtyParse (DirtyIntValue i)  = Just $ IntValue i
+dirtyParse (DirtyBoolValue b) = Just $ BoolValue b
 
 parse :: DirtyExpr -> Maybe (Expr Int)
 parse = error "Implement me"
