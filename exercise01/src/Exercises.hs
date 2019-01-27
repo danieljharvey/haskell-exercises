@@ -345,11 +345,12 @@ data DirtyExpr
   | DirtyBoolValue Bool
 
 dirtyParse :: DirtyExpr -> Maybe (Expr a)
-dirtyParse (DirtyEquals a b)  = Equals <$> dirtyParse a <*> dirtyParse b
-dirtyParse (DirtyAdd a b)     = Add <$> dirtyParse a <*> dirtyParse b
-dirtyParse (DirtyIf a b c)    = If <$> dirtyParse a <*> dirtyParse b <*> dirtyParse c
+-- dirtyParse (DirtyEquals (DirtyIntValue a) (DirtyIntValue b))  = Equals <$> dirtyParse (DirtyIntValue a) <*> dirtyParse (DirtyIntValue b)
+-- dirtyParse (DirtyAdd (DirtyIntValue a) (DirtyIntValue b)) 
+  -- = Just $ Add (IntValue a) (IntValue b)
+-- dirtyParse (DirtyIf a b c)    = If <$> dirtyParse a <*> dirtyParse b <*> dirtyParse c
 dirtyParse (DirtyIntValue i)  = Just $ IntValue i
-dirtyParse (DirtyBoolValue b) = Just $ BoolValue b
+-- dirtyParse (DirtyBoolValue b) = Just $ BoolValue b
 
 parse :: DirtyExpr -> Maybe (Expr Int)
 parse = error "Implement me"
