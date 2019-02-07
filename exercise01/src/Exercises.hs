@@ -3,8 +3,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Exercises where
 
-import Data.Semigroup ((<>))
-
+import Data.Tuple (swap)
+import Data.Monoid
 
 {- ONE -}
 
@@ -235,7 +235,7 @@ hListHead (HCons head _) = head
 -- type @HList (Int, String, Bool, ())@? Which constructor would work?
 
 patternMatchMe :: HList ((Int, String, Bool, ()),()) -> Int
-patternMatchMe (HCons (a,_,_,_) _) = a
+patternMatchMe (HCons (a, _, _, _) _) = a
 
 -- | c. Can you write a function that appends one 'HList' to the end of
 -- another? What problems do you run into?
@@ -253,8 +253,8 @@ data Branch left centre right
 -- /tree/. None of the variables should be existential.
 
 data HTree a where
-  HEmpty  :: HTree Empty
-  HBranch :: HTree left -> centre -> HTree right -> HTree (Branch left centre right)
+    HTEmpty :: HTree Empty
+    HTCons  :: l -> a -> r -> HTree (Branch l a r)
 
 -- | b. Implement a function that deletes the left subtree. The type should be
 -- strong enough that GHC will do most of the work for you. Once you have it,
@@ -265,43 +265,42 @@ myTree = HBranch left "Dog" right where
     left  = HBranch HEmpty 100 HEmpty
     right = HBranch HEmpty 200 HEmpty
 
-deleteLeft :: HTree (Branch a b c) -> HTree (Branch Empty b c)
-deleteLeft (HBranch a b c) = HBranch HEmpty b c
+deleteLeft :: HTree (Branch l a r) -> HTree (Branch (HTree Empty) a r)
+deleteLeft (HTCons _ a r) = HTCons HTEmpty a r 
 
 -- | c. Implement 'Eq' for 'HTree's. Note that you might have to write more
 -- than one to cover all possible HTrees. Recursion is your friend here - you
 -- shouldn't need to add a constraint to the GADT!
 
-instance (Eq (HTree l), Eq c, Eq (HTree r)) => Eq (HTree (Branch l c r)) where
-    (HBranch a b c) == (HBranch d e f) = (a == d) && (b == e) && (c == f)
+instance (Eq l, Eq a, Eq r) => Eq (HTree (Branch l a r)) where
+    (HTCons l a r) == (HTCons l' a' r') 
+      = (l == l') && (a == a') && (r == r')
 
 instance Eq (HTree Empty) where
-    _ == _ = True
-
+    HTEmpty == HTEmpty = True
 
 {- EIGHT -}
 
 -- | a. Implement the following GADT such that values of this type are lists of
 -- values alternating between the two types. For example:
 --
--- @
---   f :: AlternatingList Bool Int
---   f = ACons True (ACons 1 (ACons False (ACons 2 ANil)))
--- @
+f :: AlternatingList Bool Int
+f = ACons True (ACons 1 (ACons False (ACons 2 (ACons True ANil))))
 
 data AlternatingList a b where
-  ANil  :: AlternatingList a b
+  ANil  :: AlternatingList a b 
   ACons :: a -> AlternatingList b a -> AlternatingList a b
 
 -- | b. Implement the following functions.
 
-getFirsts :: AlternatingList a b -> [a]
-getFirsts (ACons a (ACons _ as)) = a : (getFirsts as)
-getFirsts _                      = []
+getFirsts (ACons a (ACons _ as)) = [a] ++ getFirsts as
+getFirsts (ACons a ANil) = [a]
+getFirsts ANil = []
 
 getSeconds :: AlternatingList a b -> [b]
-getSeconds (ACons _ (ACons b as)) = b : (getSeconds as)
-getSeconds _                      = []
+getSeconds (ACons _ (ACons b bs)) = [b] ++ getSeconds bs
+getSeconds (ACons _ ANil) = []
+getSeconds (ANil) = []
 
 -- | c. One more for luck: write this one using the above two functions, and
 -- then write it such that it only does a single pass over the list.
@@ -313,9 +312,14 @@ foldValues aList = foldG start aList where
     foldG (as, bs) (ACons a (ACons b rest)) = foldG (as `mappend` a, bs `mappend` b) rest 
     foldG s (ANil) = s
 
+foldValues2 :: (Monoid a, Monoid b) => AlternatingList a b -> (a, b)
+foldValues2 list = foldyBoy (mempty, mempty) list
 
-
-
+foldyBoy :: (Monoid a, Monoid b) => (a, b) -> AlternatingList a b -> (a, b)
+foldyBoy x ANil = x
+foldyBoy (as, bs) (ACons a next)
+    = swap (foldyBoy (bs, a <> as) next)
+        
 {- NINE -}
 
 -- | Here's the "classic" example of a GADT, in which we build a simple
@@ -332,10 +336,10 @@ data Expr a where
 -- | a. Implement the following function and marvel at the typechecker:
 
 eval :: Expr a -> a
-eval (Equals a b)  = eval a == eval b
-eval (Add a b)     = eval a + eval b
-eval (If cond a b) = if (eval cond) then eval a else eval b 
-eval (IntValue a)  = a
+eval (Equals x y) = eval x == eval y
+eval (Add a b)    = eval a + eval b
+eval (If i a b) = if eval i then eval a else eval b
+eval (IntValue i)  = i
 eval (BoolValue b) = b
 
 -- | b. Here's an "untyped" expression language. Implement a parser from this
@@ -348,6 +352,7 @@ data DirtyExpr
   | DirtyIf        DirtyExpr DirtyExpr DirtyExpr
   | DirtyIntValue  Int
   | DirtyBoolValue Bool
+
 
 parse :: DirtyExpr -> Maybe (Expr Int)
 parse dirty = let 
