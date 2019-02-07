@@ -1,9 +1,9 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+
 module Exercises where
 
-import Data.Semigroup ((<>))
+
+
 
 
 {- ONE -}
@@ -253,30 +253,21 @@ data Branch left centre right
 -- /tree/. None of the variables should be existential.
 
 data HTree a where
-  HEmpty  :: HTree Empty
-  HBranch :: HTree left -> centre -> HTree right -> HTree (Branch left centre right)
+  HEmpty  :: HTree ()
+  HBranch :: HTree left -> centre -> HTree right -> HTree (left, centre, right)
 
 -- | b. Implement a function that deletes the left subtree. The type should be
 -- strong enough that GHC will do most of the work for you. Once you have it,
 -- try breaking the implementation - does it type-check? If not, why not?
 
-myTree :: HTree (Branch (Branch Empty Integer Empty) String (Branch Empty Integer Empty))
-myTree = HBranch left "Dog" right where
-    left  = HBranch HEmpty 100 HEmpty
-    right = HBranch HEmpty 200 HEmpty
-
-deleteLeft :: HTree (Branch a b c) -> HTree (Branch Empty b c)
-deleteLeft (HBranch a b c) = HBranch HEmpty b c
+myTree
 
 -- | c. Implement 'Eq' for 'HTree's. Note that you might have to write more
 -- than one to cover all possible HTrees. Recursion is your friend here - you
 -- shouldn't need to add a constraint to the GADT!
 
-instance (Eq (HTree l), Eq c, Eq (HTree r)) => Eq (HTree (Branch l c r)) where
-    (HBranch a b c) == (HBranch d e f) = (a == d) && (b == e) && (c == f)
 
-instance Eq (HTree Empty) where
-    _ == _ = True
+
 
 
 {- EIGHT -}
@@ -290,28 +281,22 @@ instance Eq (HTree Empty) where
 -- @
 
 data AlternatingList a b where
-  ANil  :: AlternatingList a b
-  ACons :: a -> AlternatingList b a -> AlternatingList a b
+  -- ...
 
 -- | b. Implement the following functions.
 
 getFirsts :: AlternatingList a b -> [a]
-getFirsts (ACons a (ACons _ as)) = a : (getFirsts as)
-getFirsts _                      = []
+getFirsts = error "Implement me!"
 
 getSeconds :: AlternatingList a b -> [b]
-getSeconds (ACons _ (ACons b as)) = b : (getSeconds as)
-getSeconds _                      = []
+getSeconds = error "Implement me, too!"
 
 -- | c. One more for luck: write this one using the above two functions, and
 -- then write it such that it only does a single pass over the list.
 
 foldValues :: (Monoid a, Monoid b) => AlternatingList a b -> (a, b)
-foldValues aList = foldG start aList where
-    start = (mempty, mempty)
-    
-    foldG (as, bs) (ACons a (ACons b rest)) = foldG (as `mappend` a, bs `mappend` b) rest 
-    foldG s (ANil) = s
+foldValues = error "Implement me, three!"
+
 
 
 
@@ -332,11 +317,7 @@ data Expr a where
 -- | a. Implement the following function and marvel at the typechecker:
 
 eval :: Expr a -> a
-eval (Equals a b)  = eval a == eval b
-eval (Add a b)     = eval a + eval b
-eval (If cond a b) = if (eval cond) then eval a else eval b 
-eval (IntValue a)  = a
-eval (BoolValue b) = b
+eval = error "Implement me"
 
 -- | b. Here's an "untyped" expression language. Implement a parser from this
 -- into our well-typed language. Note that (until we cover higher-rank
@@ -350,17 +331,7 @@ data DirtyExpr
   | DirtyBoolValue Bool
 
 parse :: DirtyExpr -> Maybe (Expr Int)
-parse dirty = let 
-  niceExpr = clean dirty
-
-  clean (DirtyIntValue i)  = IntValue i
-  clean (DirtyBoolValue b) = BoolValue b
-  clean (DirtyAdd a b)     = Add (clean a) (clean b)
-  clean (DirtyEquals a b)  = Equals (clean a) (clean b)
-  
-              in case niceExpr of 
-                (IntValue i) -> Just (IntValue i)
-                _            -> Nothing
+parse = error "Implement me"
 
 -- | c. Can we add functions to our 'Expr' language? If not, why not? What
 -- other constructs would we need to add? Could we still avoid 'Maybe'?
